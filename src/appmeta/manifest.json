@@ -1,0 +1,9 @@
+{
+  "format_version": 1,
+  "id": "me.molodtsov.superbar",
+  "name": "SuperBar",
+  "version": "0.1.0",
+  "api_version": "27.14.0",
+  "description": "Clock, weather, timers, world clocks, reminders, and countdowns.",
+  "author": "Yury Molodtsov"
+}

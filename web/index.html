@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>SuperBar</title>
+    <link rel="icon" href="/favicon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="/">SuperBar</a>
+      <div class="header-actions">
+        <span id="save-state" role="status"></span
+        ><button id="save" class="primary" disabled>Send to Bar</button>
+      </div>
+    </header>
+    <main>
+      <section class="preview-panel" aria-label="Device preview">
+        <div class="preview-toolbar">
+          <label for="scenario" class="sr-only">Preview scenario</label
+          ><select id="scenario">
+            <option value="live">Live data</option>
+            <option value="rain">Rain alert</option>
+            <option value="rain-icon">Rain icon</option>
+            <option value="storm-icon">Storm icon</option>
+            <option value="done">Timer finished</option>
+            <option value="offline">Stale weather</option>
+            <option value="night">Quiet hours</option>
+          </select>
+        </div>
+        <div class="device-stage">
+          <div class="bar-shell">
+            <div class="bar-top">
+              <span class="slot"></span><span class="power-key"></span><span class="wheel"></span>
+            </div>
+            <div class="display-inset">
+              <canvas id="front" width="864" height="192" role="img"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="controls" aria-label="Simulator controls">
+          <button id="back" title="Back (Esc). Again on the clock to quit.">← Back</button>
+          <div class="wheel-controls">
+            <button id="prev" title="Turn wheel (←)" aria-label="Turn wheel backward">−</button
+            ><button id="ok" title="OK (Enter)">OK</button
+            ><button id="next" title="Turn wheel (→)" aria-label="Turn wheel forward">+</button>
+          </div>
+          <button id="start" class="start" title="Start (Space)">Start</button
+          ><button id="hold" title="Hold OK: cancel a timer or dismiss a reminder">Hold OK</button>
+        </div>
+        <p id="sim-message" class="muted" role="status"></p>
+        <div class="back-preview">
+          <span class="eyebrow">Back display</span>
+          <div class="back-shell">
+            <canvas id="back-display" width="480" height="240" aria-hidden="true"></canvas>
+          </div>
+        </div>
+      </section>
+      <section class="settings-panel" aria-label="SuperBar settings">
+        <nav class="tabs" role="tablist" aria-label="Settings categories">
+          <button role="tab" data-tab="display" class="selected" aria-selected="true">
+            Display</button
+          ><button role="tab" data-tab="weather" aria-selected="false" tabindex="-1">Weather</button
+          ><button role="tab" data-tab="tools" aria-selected="false" tabindex="-1">Tools</button
+          ><button role="tab" data-tab="behavior" aria-selected="false" tabindex="-1">
+            Attention
+          </button>
+        </nav>
+        <form id="settings" novalidate></form>
+      </section>
+    </main>
+    <div id="toast" role="status" hidden></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

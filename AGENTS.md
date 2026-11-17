@@ -1,0 +1,82 @@
+# SuperBar
+
+BUSY Bar JavaScript app, plus a local browser simulator and settings page. `CLAUDE.md` is a symlink to this file.
+
+## Scope
+
+- No dinosaur. Keep the 72×16 front display clean and legible.
+- Weather alerts are enabled by default: a 30-second full-screen message followed by a small persistent weather icon. Keep icons clear of existing content. SuperBar has no sound setting or audio calls.
+- Device entry point: `src/main.js`. Shared behavior and rendering: `shared/`. Simulator and settings page: `web/` served by `scripts/dev.mjs`. The archived agent-status companion is in `archive/companion/`; do not restore it without a new request.
+- Firmware is an external dependency. Never modify it or invent undocumented endpoints.
+- Busy's documented cloud API has no calendar event listing. Use Busy’s existing calendar overlays only. No Google OAuth, custom calendar feed, iCloud integration, or free-time calculation. Never scrape Busy account tokens.
+
+## Device runtime
+
+- Target firmware 1.3.1+. Device code runs in JerryScript, not Node or a browser. Do not use Node modules, DOM, or Intl in the device bundle. Guard newer built-ins (for example `String.prototype.normalize`, which is undefined on 1.3.1).
+- The firmware builds JerryScript without Annex B (`lib/jerryscript.scons`), so `substr`, `escape`, `getYear` and similar throw "Expected a function". `npm run check` rejects them. ES2020 syntax, typed arrays, Map/Set and string iteration work. Test unknown built-ins with a throwaway probe app before relying on them.
+- The device CPU is about 600× slower than a laptop. A full front and back build costs about 150 ms. Rebuild only when the view changes, and memoize text cleaning and measuring. Local `jerry` (Homebrew `jerryscript`) is useful for relative profiling.
+- The firmware clears an app's whole canvas on short Back, BUSY, Custom, Off, Apps, or Settings, and when a higher-priority screen takes over (`canvas.c`). The app is not told. Never trust a "sent" cache: redraw everything after Back, and periodically.
+- World clocks use `GET /api/time/tzlist` (in firmware 1.3.1's `api_time.c`): 115 cities by name with current offsets. Its database is older than current rules in places (Brazil still has DST).
+- HTTP API base on device: `http://localhost/api`. Use the documented settings GET; do not require writable settings or localStorage.
+- At most one display request in flight; send only changed elements. Poll remote sources on human time scales, with bounded data and backoff.
+- Input events: `{key, action, delta}`. Keys include `encoder` (with `delta`, sign = direction), `ok`, `start`, `back`. React to `short` and `long`; ignore raw `press`/`release`. Back returns to clock, Back again quits. Long Back is firmware-owned.
+- Device priority is 50; never displace native BUSY (90) or calendar overlays.
+- Default heap is 128 KiB (max 512). The bundle is about 35 KB, including about 14 KB of glyph data. Measure on hardware before raising `heap_size_kib`.
+
+## Display specs (firmware source)
+
+Primary sources in `busy-app/busybar-firmware` (public). Check the tag matching the target firmware:
+
+- `applications/services/web_server/http_api/api_display.c`: element types and fields.
+- `applications/services/canvas/canvas_widgets.c`: rendering; text is an LVGL label.
+- `assets/shared/fonts/ttf/`: font sources.
+
+Element types: `text`, `image`, `animation`, `rectangle`, `countdown`, `xpmbitmap`. Text fields include `font`, `color` (`#RRGGBBAA`), `width`, `scroll_rate` (characters per minute), `scroll_start_delay`, `scroll_repeat_delay`. A nonzero `scroll_rate` scrolls circularly; otherwise text clips at `width`. XPM, image, and animation accept `opacity` 0–100. `countdown` takes `timestamp` (string), `direction` (`time_left`/`time_since`), `show_hours`; its font is fixed to `busy_superscript_7`.
+
+API font names (identical on 1.3.1 and `dev`):
+
+| Name | Firmware font | Cap height | Line box (ascent + descent) |
+| --- | --- | --- | --- |
+| `tiny` | busy_tiny | — | — |
+| `small` | busy_regular_5 | 5 | 9 (7 + 2) |
+| `normal` | busy_regular_7 | 7 | 11 (9 + 2) |
+| `condensed` | busy_condensed_7 | 7 | 11 (9 + 2) |
+| `bold` | busy_bold_7 | 7 | 11 (9 + 2) |
+| `large` | busy_regular_9 | 9 | 13 (11 + 2) |
+| `extra_large` | busy_bold_10 | 10 | 14 (12 + 2) |
+| `global` | lana_pixel_regular_11 | — | — |
+| `superscript` | busy_superscript_7 | — | — |
+
+- The Busy TTFs use 16 units per em and are converted by `lv_font_conv` at size 16, so one font unit is one pixel. That makes exact 1-bit glyph extraction possible.
+- The fonts are proportional: `1` is narrow and `extra_large` `14:07` is 31 px wide. Left-align clocks to avoid per-minute jitter.
+- Capitals in `small` are 4–6 px wide, so about six fit in 29 px. Lowercase `small` is only 3–4 px tall; use capitals for small text.
+- Alignment follows Flipper Zero conventions: `align` names the anchor point of the element. For `top_left`, `y` is the top of the line box, so cap top = `y + ascent − cap` (verified on hardware).
+- The back display's firmware status column (Bluetooth, Wi-Fi, sound, USB, battery) covers x 149–158. Keep back text to x ≤ 145.
+- App icons: `src/appmeta/icon_front_8x8.png` (RGBA, drawn in the top-left 7×7) and `icon_back_11x11.png` (#888888 line art), as in Busy's apps.
+
+## Rendering rules
+
+- Front text uses `shared/fonts.js`, generated by `scripts/extract-fonts.py` (needs Pillow and fontTools; pass the firmware `ttf/` directory). Never hand-edit it or replace BUSY glyphs with generic scaled fonts. The clock alone extends its center row by one pixel to reach an 11-pixel cap height, as requested; keep its width unchanged. Add a font only if a layout uses it; each one costs about 3–4 KB of bundle.
+- Front grid (`shared/pixels.js`): left margin x=3. `extra_large` values occupy cap rows 3–12; clock digits alone extend to rows 2–12, aligning with both side-column lines. Small lines use cap rows 2–6 and 8–12, so the lower line shares the digits' baseline. Row 15 is reserved for the timer progress bar. The clock side column starts at x=43, 29 px wide.
+- Colors: values in white. In the right column, the top line uses `accent` (Top accent) and the bottom line uses `accent_bottom` (Bottom accent). Status colors override them: amber for paused or reminder, green for done, muted for stale or dimmed.
+- `/api/screen` returns BGR pixels for the front display (base64, 72×16×3). The back display is 4-bit gray, low nibble first.
+- Three layouts: `clock`, `hero` (value left, label/detail right), `text` (small label above one `normal` or `condensed` line). Views in `shared/model.js` choose a layout; `detail` may be a list of candidates, and the first that fits wins.
+- Shorten overlong text at a word boundary with `…`, never mid-word without an ellipsis. Let the back display scroll the full text natively.
+- The back display (160×80) uses native text elements. The simulator renders the same `backElements()` output through `backFrame()`; keep one source for both.
+- Keep labels functional. Do not add branding, explanatory captions, or permanent hints to either display or the setup page. Put context in tooltips, help text, or the README.
+
+## Security
+
+- Never commit `.env`, `.data`, calendar URLs, OAuth tokens, or API passwords.
+- `scripts/dev.mjs` listens on loopback only and checks the Host header. The page talks to the Bar directly; its CSP allows only the Bar's origin and Open-Meteo.
+
+## Verification
+
+- Run `npm run format`, `npm test`, `npm run check`, and `npm run build` before delivery. Tests execute the packaged bundle, so build before testing.
+- Check visuals, not only behavior: render every view (front bitmaps print as ASCII from `frame(view).rows`) and look for overlaps, clipping, and alignment. Browser-test the setup page at desktop width and 390 px.
+- Headless Chrome screenshots have a minimum window width of about 500 px and misreport mobile layouts. Use a tool that sets a true viewport (for example gstack `browse viewport 390x844`). The page's CSP blocks iframes.
+- Verify on the Bar before claiming hardware behavior. USB address: `http://10.0.4.20`. Install with `npm run app:install` (`scripts/install.mjs`); `busy-cli app` commands fail against 1.3.1 on Node 26. Use `scripts/bar.mjs` for any request to the Bar from Node, because Node's fetch rejects its responses.
+- Device logs: `POST /api/log_dump`, then `GET /api/storage/read?path=/ext/log.txt`. `console.error` lines appear as `[E][me.molodtsov.superbar]`; errors are logged as `SuperBar <stage>: <message>`.
+- `POST /api/input?key=…` clicks a key once (`up`/`down` turn the wheel). It cannot send long presses.
+
+- Catalog release builds use plain `busy-cli build`, without custom hooks. Commit generated assets; run `npm run generate` after editing their sources. Keep licenses and notices in both the repository and packaged resources.

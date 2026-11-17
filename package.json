@@ -1,0 +1,30 @@
+{
+  "name": "superbar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A configurable BUSY Bar dashboard: clock, weather, timer, world clocks, reminder, and countdown.",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env scripts/dev.mjs",
+    "dev": "node --env-file-if-exists=.env scripts/dev.mjs",
+    "test": "node --test test/*.test.mjs",
+    "build": "busy-cli build",
+    "app:install": "node --env-file-if-exists=.env scripts/install.mjs",
+    "app:run": "node --env-file-if-exists=.env scripts/install.mjs --launch-only",
+    "check": "node scripts/check.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "generate": "node scripts/settings.mjs"
+  },
+  "devDependencies": {
+    "@busy-app/cli": "^0.6.0",
+    "prettier": "3.9.10"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "overrides": {
+    "vite": "^8.1.6"
+  },
+  "license": "MIT"
+}
